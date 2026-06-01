@@ -36,16 +36,16 @@ return [
     ],
 
     'palmpesa' => [
-    'base_url' => env('PALMPESA_BASE_URL', 'https://palmpesa.drmlelwa.co.tz'),
-    'key'      => env('PALMPESA_API_KEY'),
-    'user_id'  => env('PALMPESA_USER_ID'),
-],
+        'base_url' => env('PALMPESA_BASE_URL', 'https://palmpesa.drmlelwa.co.tz'),
+        'key'      => env('PALMPESA_API_KEY'),
+        'user_id'  => env('PALMPESA_USER_ID'),
+    ],
 
-'mikrotik' => [
-    'ip'       => env('MIKROTIK_IP', '192.168.88.1'),
-    'user'     => env('MIKROTIK_USER', 'mikhmon'),
-    'password' => env('MIKROTIK_PASSWORD', 'mikhmon'),
-    'port'     => env('MIKROTIK_PORT', 8728),
-],
+    'mikrotik' => [
+        'ip'       => env('MIKROTIK_IP', '192.168.88.1'),
+        'user'     => env('MIKROTIK_USER', 'mikhmon'),
+        'password' => env('MIKROTIK_PASSWORD', 'mikhmon'),
+        'port'     => env('MIKROTIK_PORT', 8728),
+    ],
 
 ];
