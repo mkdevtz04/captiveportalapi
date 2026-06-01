@@ -33,15 +33,16 @@ class PaymentController extends Controller
         $request->validate([
             'phone'   => 'required|string|min:10',
             'package' => 'required|in:bronze,silver,gold',
-            'name'    => 'required|string|max:100',
         ]);
+
+        $name = 'Customer TRINET';
 
         $packages = config('package');
         $pkg      = $packages[$request->package];
 
         try {
             $result = $this->palmPesa->initiatePayment([
-                'name'    => $request->name,
+                'name'    => $name,
                 'phone'   => $request->phone,
                 'amount'  => $pkg['price'],
                 'email'   => $request->email ?? 'customer@trinetpay.online',
@@ -52,7 +53,7 @@ class PaymentController extends Controller
                 'transaction_id' => $result['transaction_id'],
                 'order_id'       => $result['order_id'],
                 'phone'          => $request->phone,
-                'name'           => $request->name,
+                'name'           => $name,
                 'package'        => $request->package,
                 'profile'        => $pkg['profile'],
                 'amount'         => $pkg['price'],
