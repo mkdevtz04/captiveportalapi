@@ -336,7 +336,6 @@
         .footer a{color:#0b7a75;text-decoration:none;font-weight:700}
         @media(max-width:900px){
             .portal,.layout{grid-template-columns:1fr}
-            .side{order:-1}
         }
         @media(max-width:560px){
             .page{padding:0;align-items:stretch}
@@ -366,6 +365,19 @@
             </p>
 
             <div class="layout">
+                <div class="packages" aria-label="Available packages">
+                    <div class="pkg-header">Available Packages</div>
+                    @foreach($packages as $key => $pkg)
+                    <div class="package" onclick="selectPackage('{{ $key }}', {{ $pkg['price'] }}, '{{ $pkg['name'] }}', '{{ $pkg['duration'] }}')">
+                        <div>
+                            <div class="pkg-name">{{ $pkg['name'] }} {{ $pkg['icon'] }}</div>
+                            <div class="pkg-desc">{{ $pkg['duration'] }} - {{ $pkg['speed'] }}</div>
+                        </div>
+                        <div class="price">{{ number_format($pkg['price']) }} TZS</div>
+                    </div>
+                    @endforeach
+                </div>
+
                 <div class="payment-box">
                     <h2 class="section-title">Purchase WiFi Access</h2>
                     <p class="method-note">Choose a package and enter your phone number to proceed with payment.</p>
@@ -392,18 +404,6 @@
                     </p>
                 </div>
 
-                <div class="packages" aria-label="Available packages">
-                    <div class="pkg-header">Available Packages</div>
-                    @foreach($packages as $key => $pkg)
-                    <div class="package" onclick="selectPackage('{{ $key }}', {{ $pkg['price'] }}, '{{ $pkg['name'] }}', '{{ $pkg['duration'] }}')">
-                        <div>
-                            <div class="pkg-name">{{ $pkg['name'] }} {{ $pkg['icon'] }}</div>
-                            <div class="pkg-desc">{{ $pkg['duration'] }} • {{ $pkg['speed'] }}</div>
-                        </div>
-                        <div class="price">{{ number_format($pkg['price']) }} TZS</div>
-                    </div>
-                    @endforeach
-                </div>
             </div>
 
             <div class="footer">
@@ -413,16 +413,6 @@
         </div>
 
         <aside class="side" aria-label="Payment methods and contact">
-            <p class="side-title">Supported Payment Methods</p>
-
-            <div class="operators" aria-label="Mobile network operators">
-                <div class="operator vodacom">Vodacom</div>
-                <div class="operator airtel">Airtel</div>
-                <div class="operator tigo">Tigo</div>
-            </div>
-
-            <div class="divider"></div>
-
             <div class="contacts">
                 <p class="contacts-label">Need Help?</p>
                 <a href="tel:+255700000000">+255 700 000 000</a>
@@ -432,6 +422,16 @@
             <p class="side-footer">
                 TRINET SOLUTION provides reliable, fast, and affordable WiFi hotspot internet access across Tanzania. Connect instantly with our easy payment options.
             </p>
+
+            <div class="divider"></div>
+
+            <p class="side-title">Supported Payment Methods</p>
+
+            <div class="operators" aria-label="Mobile network operators">
+                <div class="operator vodacom">Vodacom</div>
+                <div class="operator airtel">Airtel</div>
+                <div class="operator tigo">Tigo</div>
+            </div>
         </aside>
     </section>
 </main>
