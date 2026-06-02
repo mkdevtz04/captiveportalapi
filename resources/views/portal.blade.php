@@ -446,6 +446,7 @@ let selectedPrice = null;
 let pollingInterval = null;
 let currentTxnId = null;
 let currentOrderId = null;
+const hotspot = @json($hotspot ?? []);
 
 function selectPackage(key, price, name, duration) {
     selectedPackage = key;
@@ -493,6 +494,49 @@ function showVoucher(username, password, pkgName) {
     `;
 }
 
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    }[ch]));
+}
+
+function showVoucher(token, pkgName, loginUrl = null, dst = null) {
+    const box = document.getElementById('modalBox');
+    const canAutoLogin = Boolean(loginUrl);
+
+    box.innerHTML = `
+        <span class="modal-icon">OK</span>
+        <div class="modal-title">Payment Successful!</div>
+        <div class="modal-msg">${canAutoLogin ? 'Your WiFi access has been activated. Connecting your device now...' : 'Your WiFi access has been activated. Use the token below to connect.'}</div>
+        <div class="voucher-card">
+            <div class="voucher-label">WiFi Token</div>
+            <div class="voucher-value">${escapeHtml(token)}</div>
+        </div>
+        <p style="color:#667085;font-size:13px;margin:16px 0">Package: <strong>${escapeHtml(pkgName)}</strong></p>
+        ${canAutoLogin ? `
+            <form id="hotspotLoginForm" action="${escapeHtml(loginUrl)}" method="post">
+                <input type="hidden" name="username" value="${escapeHtml(token)}">
+                <input type="hidden" name="password" value="${escapeHtml(token)}">
+                <input type="hidden" name="dst" value="${escapeHtml(dst || 'http://www.google.com')}">
+                <input type="hidden" name="popup" value="true">
+                <button class="submit" type="submit">Connect Now</button>
+            </form>
+        ` : ''}
+        <button class="modal-btn" onclick="location.reload()">Close</button>
+    `;
+
+    if (canAutoLogin) {
+        setTimeout(() => {
+            const form = document.getElementById('hotspotLoginForm');
+            if (form) form.submit();
+        }, 1200);
+    }
+}
+
 async function initiatePayment() {
     const phone = document.getElementById('phoneInput').value.trim();
 
@@ -513,7 +557,14 @@ async function initiatePayment() {
                 'Accept': 'application/json',
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
             },
-            body: JSON.stringify({ phone, package: selectedPackage })
+            body: JSON.stringify({
+                phone,
+                package: selectedPackage,
+                mac: hotspot.mac || null,
+                ip: hotspot.ip || null,
+                link_login_only: hotspot.link_login_only || null,
+                link_orig: hotspot.link_orig || null
+            })
         });
 
         const data = await res.json();
@@ -551,7 +602,7 @@ function startPolling() {
 
             if (data.status === 'paid') {
                 clearInterval(pollingInterval);
-                showVoucher(data.voucher_user, data.voucher_pass, data.package);
+                showVoucher(data.wifi_token, data.package, data.login_url, data.dst);
             } else if (data.status === 'failed') {
                 clearInterval(pollingInterval);
                 showModal('❌', 'Payment Failed', 'Payment was declined. Please try again.');

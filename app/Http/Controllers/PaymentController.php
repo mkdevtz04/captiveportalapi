@@ -21,18 +21,33 @@ class PaymentController extends Controller
     }
 
     // Show portal page
-    public function index()
+    public function index(Request $request)
     {
         $packages = config('package');
-        return view('portal', compact('packages'));
+        $hotspot = [
+            'mac'             => $request->query('mac'),
+            'ip'              => $request->query('ip'),
+            'username'        => $request->query('username'),
+            'link_login_only' => $request->query('link-login-only'),
+            'link_orig'       => $request->query('link-orig'),
+            'error'           => $request->query('error'),
+        ];
+
+        return view('portal', compact('packages', 'hotspot'));
     }
 
     // Initiate payment
     public function initiate(Request $request)
     {
+        $packageKeys = implode(',', array_keys(config('package')));
+
         $request->validate([
             'phone'   => 'required|string|min:10',
-            'package' => 'required|in:bronze,silver,gold',
+            'package' => 'required|in:' . $packageKeys,
+            'mac' => 'nullable|string|max:32',
+            'ip' => 'nullable|string|max:45',
+            'link_login_only' => 'nullable|string|max:255',
+            'link_orig' => 'nullable|string|max:255',
         ]);
 
         $name = 'Customer TRINET';
@@ -58,7 +73,12 @@ class PaymentController extends Controller
                 'profile'        => $pkg['profile'],
                 'amount'         => $pkg['price'],
                 'status'         => 'pending',
+                'client_mac'     => $request->mac,
+                'client_ip'      => $request->ip,
+                'link_login_only'=> $request->link_login_only,
+                'link_orig'      => $request->link_orig,
             ], now()->addMinutes(30));
+            Cache::put('order_' . $result['order_id'], $result['transaction_id'], now()->addMinutes(30));
 
             return response()->json([
                 'status'         => 'success',
@@ -135,9 +155,10 @@ class PaymentController extends Controller
         if ($transaction['status'] === 'paid') {
             return response()->json([
                 'status'       => 'paid',
-                'voucher_user' => $transaction['voucher_user'],
-                'voucher_pass' => $transaction['voucher_pass'],
+                'wifi_token'   => $transaction['wifi_token'],
                 'package'      => $transaction['package'],
+                'login_url'    => $transaction['link_login_only'] ?? null,
+                'dst'          => $transaction['link_orig'] ?? null,
             ]);
         }
 
@@ -147,25 +168,23 @@ class PaymentController extends Controller
     // Create MikroTik voucher and unlock internet
     private function unlockInternet(array $transaction, string $transactionId): void
     {
-        $username = 'TN' . rand(10000, 99999);
-        $password = (string) rand(1000, 9999);
+        $token = 'TN' . rand(100000, 999999);
 
         if ($this->mikrotik->connect()) {
             $created = $this->mikrotik->createHotspotUser(
-                $username,
-                $password,
+                $token,
+                $token,
                 $transaction['profile']
             );
             $this->mikrotik->disconnect();
 
             if ($created) {
-                $transaction['status']       = 'paid';
-                $transaction['voucher_user'] = $username;
-                $transaction['voucher_pass'] = $password;
+                $transaction['status']     = 'paid';
+                $transaction['wifi_token'] = $token;
                 Cache::put('txn_' . $transactionId, $transaction, now()->addDay());
 
                 Log::info('Internet unlocked', [
-                    'username' => $username,
+                    'wifi_token' => $token,
                     'package'  => $transaction['package'],
                 ]);
             }
@@ -174,10 +193,14 @@ class PaymentController extends Controller
         }
     }
 
-    private function findTransactionByOrderId(string $orderId): ?string
+    private function findTransactionByOrderId(?string $orderId): ?string
     {
         // Simple approach — order_id is stored in cache
         // For production use a database instead
-        return null;
+        if (!$orderId) {
+            return null;
+        }
+
+        return Cache::get('order_' . $orderId);
     }
 }

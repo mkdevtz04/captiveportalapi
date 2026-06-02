@@ -1,5 +1,13 @@
 <?php
 return [
+    'starter' => [
+        'name'    => 'Starter',
+        'duration'=> 'Test',
+        'price'   => 50,
+        'profile' => 'Starter-50',
+        'speed'   => '1 Mbps',
+        'icon'    => '*',
+    ],
     'bronze' => [
         'name'    => 'Bronze',
         'duration'=> '6 Hour',
