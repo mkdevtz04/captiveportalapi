@@ -137,32 +137,25 @@ function showModal(icon, title, msg, spinner) {
 
 function showSuccess(token, pkgName, loginUrl, dst) {
   const canAutoLogin = Boolean(loginUrl);
-  const form = canAutoLogin ? `
-    <form id="hsForm" action="${safe(loginUrl)}" method="post">
-      <input type="hidden" name="username" value="${safe(token)}">
-      <input type="hidden" name="password" value="">
-      <input type="hidden" name="dst" value="${safe(dst || 'http://www.google.com')}">
-      <input type="hidden" name="popup" value="true">
-      <button class="m-btn primary" type="submit">Connect Now</button>
-    </form>` : '';
+  const target = dst || 'http://www.google.com';
+  const connectUrl = canAutoLogin
+    ? loginUrl + '?username=' + encodeURIComponent(token) + '&password=&dst=' + encodeURIComponent(target) + '&popup=true'
+    : null;
 
   document.getElementById('modalBox').innerHTML = `
     <span class="m-icon">✅</span>
     <div class="m-title">Payment Successful!</div>
-    <div class="m-msg">${canAutoLogin ? 'Connecting your device automatically...' : 'Enter this token on the WiFi login page.'}</div>
+    <div class="m-msg">${canAutoLogin ? 'Connecting your device...' : 'Enter this token on the WiFi login page.'}</div>
     <div class="token-box">
       <div class="token-lbl">WiFi Token</div>
       <div class="token-val">${safe(token)}</div>
     </div>
     <p style="color:#667085;font-size:13px;margin-bottom:16px">Package: <strong>${safe(pkgName)}</strong></p>
-    ${form}
+    ${canAutoLogin ? `<a class="m-btn primary" href="${safe(connectUrl)}">Tap to Connect</a>` : ''}
     <button class="m-btn" onclick="document.getElementById('modal').classList.remove('show')">Close</button>`;
 
   if (canAutoLogin) {
-    setTimeout(() => {
-      const f = document.getElementById('hsForm');
-      if (f) f.submit();
-    }, 1500);
+    setTimeout(() => { window.location.href = connectUrl; }, 1500);
   }
 }
 
