@@ -173,7 +173,7 @@ class PaymentController extends Controller
         if ($this->mikrotik->connect()) {
             $created = $this->mikrotik->createHotspotUser(
                 $token,
-                $token,
+                '',
                 $transaction['profile']
             );
             $this->mikrotik->disconnect();

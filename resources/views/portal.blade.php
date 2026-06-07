@@ -140,7 +140,7 @@ function showSuccess(token, pkgName, loginUrl, dst) {
   const form = canAutoLogin ? `
     <form id="hsForm" action="${safe(loginUrl)}" method="post">
       <input type="hidden" name="username" value="${safe(token)}">
-      <input type="hidden" name="password" value="${safe(token)}">
+      <input type="hidden" name="password" value="">
       <input type="hidden" name="dst" value="${safe(dst || 'http://www.google.com')}">
       <input type="hidden" name="popup" value="true">
       <button class="m-btn primary" type="submit">Connect Now</button>
