@@ -138,24 +138,37 @@ function showModal(icon, title, msg, spinner) {
 function showSuccess(token, pkgName, loginUrl, dst) {
   const canAutoLogin = Boolean(loginUrl);
   const target = dst || 'http://www.google.com';
-  const connectUrl = canAutoLogin
-    ? loginUrl + '?username=' + encodeURIComponent(token) + '&password=&dst=' + encodeURIComponent(target) + '&popup=true'
-    : null;
+
+  // Build the verify.html URL on the router's own HTTP origin.
+  // The browser navigates there via window.location (navigation is allowed
+  // HTTPS→HTTP), and verify.html auto-POSTs the token to /login in a
+  // pure HTTP context, bypassing the mixed-content block.
+  let verifyUrl = null;
+  if (canAutoLogin) {
+    try {
+      const routerOrigin = new URL(loginUrl).origin; // e.g. http://192.168.88.1
+      verifyUrl = routerOrigin + '/verify.html'
+        + '?token='  + encodeURIComponent(token)
+        + '&dst='    + encodeURIComponent(target);
+    } catch (e) {
+      // loginUrl was malformed — fall back to manual mode
+    }
+  }
 
   document.getElementById('modalBox').innerHTML = `
     <span class="m-icon">✅</span>
     <div class="m-title">Payment Successful!</div>
-    <div class="m-msg">${canAutoLogin ? 'Connecting your device...' : 'Enter this token on the WiFi login page.'}</div>
+    <div class="m-msg">${verifyUrl ? 'Connecting your device...' : 'Enter this token on the WiFi login page.'}</div>
     <div class="token-box">
       <div class="token-lbl">WiFi Token</div>
       <div class="token-val">${safe(token)}</div>
     </div>
     <p style="color:#667085;font-size:13px;margin-bottom:16px">Package: <strong>${safe(pkgName)}</strong></p>
-    ${canAutoLogin ? `<a class="m-btn primary" href="${safe(connectUrl)}">Tap to Connect</a>` : ''}
+    ${verifyUrl ? `<a class="m-btn primary" href="${safe(verifyUrl)}">Tap to Connect</a>` : ''}
     <button class="m-btn" onclick="document.getElementById('modal').classList.remove('show')">Close</button>`;
 
-  if (canAutoLogin) {
-    setTimeout(() => { window.location.href = connectUrl; }, 1500);
+  if (verifyUrl) {
+    setTimeout(() => { window.location.href = verifyUrl; }, 1500);
   }
 }
 
