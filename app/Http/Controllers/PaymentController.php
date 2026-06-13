@@ -99,14 +99,13 @@ class PaymentController extends Controller
     // PalmPesa webhook callback
     public function callback(Request $request)
     {
-        Log::info('PalmPesa Callback', $request->all());
+        Log::info('PalmPesa Callback received', $request->all());
 
         $orderId = $request->input('order_id');
-        $status  = $request->input('payment_status');
+        $status  = strtoupper($request->input('payment_status', ''));
 
-        // Find transaction by order_id
         $transactionId = $request->input('transaction_id')
-            ?? $this->findTransactionByOrderId($orderId);
+            ?? Cache::get('order_' . $orderId);
 
         if (!$transactionId) {
             Log::warning('Callback: transaction not found', ['order_id' => $orderId]);
@@ -119,7 +118,7 @@ class PaymentController extends Controller
             return response()->json(['status' => 'not_found'], 404);
         }
 
-        if (strtoupper($status) === 'COMPLETED') {
+        if ($status === 'COMPLETED') {
             $this->unlockInternet($transaction, $transactionId);
         } else {
             $transaction['status'] = 'failed';
@@ -159,7 +158,7 @@ class PaymentController extends Controller
             }
         }
 
-       
+
         if ($transaction['status'] === 'paid') {
             return response()->json([
                 'status'       => 'paid',
