@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Services\PalmPesaService;
@@ -75,7 +76,7 @@ class PaymentController extends Controller
                 'status'         => 'pending',
                 'client_mac'     => $request->mac,
                 'client_ip'      => $request->ip,
-                'link_login_only'=> $request->link_login_only,
+                'link_login_only' => $request->link_login_only,
                 'link_orig'      => $request->link_orig,
             ], now()->addMinutes(30));
             Cache::put('order_' . $result['order_id'], $result['transaction_id'], now()->addMinutes(30));
@@ -86,7 +87,6 @@ class PaymentController extends Controller
                 'transaction_id' => $result['transaction_id'],
                 'order_id'       => $result['order_id'],
             ]);
-
         } catch (\Exception $e) {
             Log::error('Payment initiation failed: ' . $e->getMessage());
             return response()->json([
@@ -129,11 +129,14 @@ class PaymentController extends Controller
         return response()->json(['status' => 'received'], 200);
     }
 
-    // Check payment status (polled by frontend)
     public function checkStatus(Request $request)
     {
         $transactionId = $request->input('transaction_id');
         $orderId       = $request->input('order_id');
+
+        if (!$transactionId) {
+            return response()->json(['status' => 'not_found']);
+        }
 
         $transaction = Cache::get('txn_' . $transactionId);
 
@@ -141,35 +144,42 @@ class PaymentController extends Controller
             return response()->json(['status' => 'not_found']);
         }
 
-        // If still pending — poll PalmPesa directly
+        // If still pending, try to check with PalmPesa
         if ($transaction['status'] === 'pending' && $orderId) {
-            $result = $this->palmPesa->checkStatus($orderId);
-            $paymentStatus = $result['data'][0]['payment_status'] ?? 'PENDING';
+            try {
+                $result = $this->palmPesa->checkStatus($orderId);
+                $paymentStatus = strtoupper($result['data'][0]['payment_status'] ?? 'PENDING');
 
-            if (strtoupper($paymentStatus) === 'COMPLETED') {
-                $this->unlockInternet($transaction, $transactionId);
-                $transaction = Cache::get('txn_' . $transactionId);
+                if ($paymentStatus === 'COMPLETED') {
+                    $this->unlockInternet($transaction, $transactionId);
+                    $transaction = Cache::get('txn_' . $transactionId); // refresh
+                }
+            } catch (\Exception $e) {
+                Log::error('PalmPesa status check failed: ' . $e->getMessage());
             }
         }
 
+       
         if ($transaction['status'] === 'paid') {
             return response()->json([
                 'status'       => 'paid',
-                'wifi_token'   => $transaction['wifi_token'],
+                'wifi_token'   => $transaction['wifi_token'] ?? null,
                 'package'      => $transaction['package'],
                 'login_url'    => $transaction['link_login_only'] ?? null,
                 'dst'          => $transaction['link_orig'] ?? null,
             ]);
         }
 
-        return response()->json(['status' => $transaction['status']]);
+        return response()->json([
+            'status' => $transaction['status']
+        ]);
     }
 
-    // Create MikroTik voucher and unlock internet
     private function unlockInternet(array $transaction, string $transactionId): void
     {
-        $token = 'TN' . rand(100000, 999999);
+        $token = 'TN' . strtoupper(substr(uniqid(), -8)); // better uniqueness
 
+        $success = false;
         if ($this->mikrotik->connect()) {
             $created = $this->mikrotik->createHotspotUser(
                 $token,
@@ -179,17 +189,20 @@ class PaymentController extends Controller
             $this->mikrotik->disconnect();
 
             if ($created) {
-                $transaction['status']     = 'paid';
-                $transaction['wifi_token'] = $token;
-                Cache::put('txn_' . $transactionId, $transaction, now()->addDay());
-
-                Log::info('Internet unlocked', [
-                    'wifi_token' => $token,
-                    'package'  => $transaction['package'],
-                ]);
+                $success = true;
+                Log::info('Hotspot user created successfully', ['token' => $token]);
             }
         } else {
-            Log::error('MikroTik connection failed for: ' . $transactionId);
+            Log::error('MikroTik connection failed during unlock for: ' . $transactionId);
+        }
+
+        // Always mark as paid (even if MikroTik fails temporarily)
+        $transaction['status']     = 'paid';
+        $transaction['wifi_token'] = $token;
+        Cache::put('txn_' . $transactionId, $transaction, now()->addDay());
+
+        if (!$success) {
+            Log::warning('MikroTik user creation failed but marked as paid anyway', ['tx' => $transactionId]);
         }
     }
 

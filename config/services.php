@@ -43,8 +43,8 @@ return [
 
     'mikrotik' => [
         'ip'       => env('MIKROTIK_IP', '192.168.88.1'),
-        'user'     => env('MIKROTIK_USER', 'mikhmon'),
-        'password' => env('MIKROTIK_PASSWORD', 'mikhmon'),
+        'user'     => env('MIKROTIK_USER', 'costa'),
+        'password' => env('MIKROTIK_PASSWORD', 'costa123'),
         'port'     => env('MIKROTIK_PORT', 8728),
     ],
 
