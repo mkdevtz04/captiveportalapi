@@ -16,15 +16,7 @@ return [
         'speed'    => '2 Mbps',
         'icon'     => '',
     ],
-    'test' => [
-        'name'     => 'Test',
-        'duration' => '1 Day',
-        'price'    => 200,
-        'profile'  => 'silver',
-        'speed'    => '2 Mbps',
-        'icon'     => '',
-    ],
-    'gold' => [
+'gold' => [
         'name'     => 'Gold',
         'duration' => '7 Days',
         'price'    => 8000,
