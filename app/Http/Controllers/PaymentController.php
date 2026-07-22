@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Str;
 use App\Services\PalmPesaService;
 use App\Services\MikrotikService;
 use Illuminate\Http\Request;
@@ -55,6 +56,7 @@ class PaymentController extends Controller
 
         $packages = config('package');
         $pkg      = $packages[$request->package];
+        $password = Str::random(10);
 
         try {
             $result = $this->palmPesa->initiatePayment([
@@ -66,20 +68,25 @@ class PaymentController extends Controller
 
             // Store transaction in cache for 30 minutes
             Cache::put('txn_' . $result['transaction_id'], [
-                'transaction_id' => $result['transaction_id'],
-                'order_id'       => $result['order_id'],
-                'phone'          => $request->phone,
-                'name'           => $name,
-                'package'        => $request->package,
-                'profile'        => $pkg['profile'],
-                'amount'         => $pkg['price'],
-                'status'         => 'pending',
-                'client_mac'     => $request->mac,
-                'client_ip'      => $request->ip,
-                'link_login_only' => $request->link_login_only,
-                'link_orig'      => $request->link_orig,
+                'transaction_id'   => $result['transaction_id'],
+                'order_id'         => $result['order_id'],
+                'phone'            => $request->phone,
+                'name'             => $name,
+                'package'          => $request->package,
+                'profile'          => $pkg['profile'],
+                'amount'           => $pkg['price'],
+                'status'           => 'pending',
+                'wifi_password'    => $password,
+                'client_mac'       => $request->mac,
+                'client_ip'        => $request->ip(),
+                'link_login_only'  => $request->link_login_only,
+                'link_orig'        => $request->link_orig,
             ], now()->addMinutes(30));
             Cache::put('order_' . $result['order_id'], $result['transaction_id'], now()->addMinutes(30));
+
+            if ($request->mac) {
+                Cache::put('mac_txn_' . $request->mac, $result['transaction_id'], now()->addMinutes(30));
+            }
 
             return response()->json([
                 'status'         => 'success',
@@ -161,11 +168,12 @@ class PaymentController extends Controller
 
         if ($transaction['status'] === 'paid') {
             return response()->json([
-                'status'       => 'paid',
-                'wifi_token'   => $transaction['wifi_token'] ?? null,
-                'package'      => $transaction['package'],
-                'login_url'    => $transaction['link_login_only'] ?? null,
-                'dst'          => $transaction['link_orig'] ?? null,
+                'status'        => 'paid',
+                'wifi_token'    => $transaction['wifi_token'] ?? null,
+                'wifi_password' => $transaction['wifi_password'] ?? null,
+                'package'       => $transaction['package'],
+                'login_url'     => $transaction['link_login_only'] ?? null,
+                'dst'           => $transaction['link_orig'] ?? null,
             ]);
         }
 
@@ -176,13 +184,14 @@ class PaymentController extends Controller
 
     private function unlockInternet(array $transaction, string $transactionId): void
     {
-        $token = 'TN' . strtoupper(substr(uniqid(), -8)); // better uniqueness
+        $token     = 'TN' . strtoupper(substr(uniqid(), -8)); // better uniqueness
+        $password  = $transaction['wifi_password'] ?? '';
 
         $success = false;
         if ($this->mikrotik->connect()) {
             $created = $this->mikrotik->createHotspotUser(
                 $token,
-                '',
+                $password,
                 $transaction['profile']
             );
             $this->mikrotik->disconnect();
@@ -200,9 +209,47 @@ class PaymentController extends Controller
         $transaction['wifi_token'] = $token;
         Cache::put('txn_' . $transactionId, $transaction, now()->addDay());
 
+        if (!empty($transaction['client_mac'])) {
+            Cache::put('mac_txn_' . $transaction['client_mac'], $transactionId, now()->addDay());
+        }
+
         if (!$success) {
             Log::warning('MikroTik user creation failed but marked as paid anyway', ['tx' => $transactionId]);
         }
+    }
+
+    public function reconnect(Request $request)
+    {
+        $mac = $request->query('mac');
+
+        if (!$mac) {
+            return response()->json(['status' => 'not_found']);
+        }
+
+        $txnId = Cache::get('mac_txn_' . $mac);
+
+        if (!$txnId) {
+            return response()->json(['status' => 'not_found']);
+        }
+
+        $transaction = Cache::get('txn_' . $txnId);
+
+        if (!$transaction) {
+            return response()->json(['status' => 'not_found']);
+        }
+
+        if ($transaction['status'] === 'paid') {
+            return response()->json([
+                'status'        => 'paid',
+                'wifi_token'    => $transaction['wifi_token'] ?? null,
+                'wifi_password' => $transaction['wifi_password'] ?? null,
+                'package'       => $transaction['package'],
+                'login_url'     => $transaction['link_login_only'] ?? null,
+                'dst'           => $transaction['link_orig'] ?? null,
+            ]);
+        }
+
+        return response()->json(['status' => $transaction['status']]);
     }
 
     private function findTransactionByOrderId(?string $orderId): ?string

@@ -107,6 +107,12 @@ let currentTxnId    = null;
 let currentOrderId  = null;
 let pollTimer       = null;
 
+window.addEventListener('DOMContentLoaded', () => {
+  if (hotspot.mac) {
+    tryReconnect();
+  }
+});
+
 function selectPackage(el) {
   document.querySelectorAll('.package').forEach(p => p.classList.remove('selected'));
   el.classList.add('selected');
@@ -135,41 +141,55 @@ function showModal(icon, title, msg, spinner) {
   document.getElementById('modal').classList.add('show');
 }
 
-function showSuccess(token, pkgName, loginUrl, dst) {
+function showSuccess(token, password, pkgName, loginUrl, dst) {
   const canAutoLogin = Boolean(loginUrl);
   const target = dst || 'http://www.google.com';
-
-  // Build the verify.html URL on the router's own HTTP origin.
-  // The browser navigates there via window.location (navigation is allowed
-  // HTTPS→HTTP), and verify.html auto-POSTs the token to /login in a
-  // pure HTTP context, bypassing the mixed-content block.
-  let verifyUrl = null;
-  if (canAutoLogin) {
-    try {
-      const routerOrigin = new URL(loginUrl).origin; // e.g. http://192.168.88.1
-      verifyUrl = routerOrigin + '/verify.html'
-        + '?token='  + encodeURIComponent(token)
-        + '&dst='    + encodeURIComponent(target);
-    } catch (e) {
-      // loginUrl was malformed — fall back to manual mode
-    }
-  }
 
   document.getElementById('modalBox').innerHTML = `
     <span class="m-icon">✅</span>
     <div class="m-title">Payment Successful!</div>
-    <div class="m-msg">${verifyUrl ? 'Connecting your device...' : 'Enter this token on the WiFi login page.'}</div>
+    <div class="m-msg">${canAutoLogin ? 'Use the details below or wait to connect automatically.' : 'Enter these details on the WiFi login page.'}</div>
     <div class="token-box">
       <div class="token-lbl">WiFi Token</div>
       <div class="token-val">${safe(token)}</div>
     </div>
+    ${password ? `<div class="token-box">
+      <div class="token-lbl">Password</div>
+      <div class="token-val">${safe(password)}</div>
+    </div>` : ''}
     <p style="color:#667085;font-size:13px;margin-bottom:16px">Package: <strong>${safe(pkgName)}</strong></p>
-    ${verifyUrl ? `<a class="m-btn primary" href="${safe(verifyUrl)}">Tap to Connect</a>` : ''}
+    <button class="m-btn primary" id="autoLoginBtn">Connect Now</button>
     <button class="m-btn" onclick="document.getElementById('modal').classList.remove('show')">Close</button>`;
 
-  if (verifyUrl) {
-    setTimeout(() => { window.location.href = verifyUrl; }, 1500);
+  if (canAutoLogin) {
+    const primaryBtn = document.getElementById('autoLoginBtn');
+    if (primaryBtn) {
+      primaryBtn.onclick = () => autoLogin(loginUrl, token, password, target);
+    }
+    setTimeout(() => autoLogin(loginUrl, token, password, target), 1500);
   }
+}
+
+function autoLogin(loginUrl, token, password, dst) {
+  if (!loginUrl || !token) return;
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = loginUrl;
+  form.innerHTML = '<input type="hidden" name="username" value="' + safe(token) + '"><input type="hidden" name="password" value="' + safe(password || '') + '"><input type="hidden" name="dst" value="' + safe(dst || 'http://www.google.com') + '">';
+  document.body.appendChild(form);
+  form.submit();
+}
+
+async function tryReconnect() {
+  const mac = hotspot.mac;
+  if (!mac) return;
+  try {
+    const res = await fetch('/api/payment/reconnect?mac=' + encodeURIComponent(mac));
+    const data = await res.json();
+    if (data.status === 'paid' && data.wifi_token) {
+      autoLogin(data.login_url, data.wifi_token, data.wifi_password, data.dst);
+    }
+  } catch (e) { /* ignore */ }
 }
 
 async function initiatePayment() {
@@ -234,7 +254,7 @@ function startPolling() {
       const data = await res.json();
       if (data.status === 'paid') {
         clearInterval(pollTimer);
-        showSuccess(data.wifi_token, data.package, data.login_url, data.dst);
+        showSuccess(data.wifi_token, data.wifi_password, data.package, data.login_url, data.dst);
       } else if (data.status === 'failed') {
         clearInterval(pollTimer);
         showModal('❌', 'Payment Failed', 'Payment was declined. Please try again.');

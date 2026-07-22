@@ -6,3 +6,4 @@ use Illuminate\Support\Facades\Route;
 Route::post('/payment/initiate', [PaymentController::class, 'initiate']);
 Route::post('/payment/callback', [PaymentController::class, 'callback']);
 Route::get('/payment/status',    [PaymentController::class, 'checkStatus']);
+Route::get('/payment/reconnect', [PaymentController::class, 'reconnect']);
