@@ -88,6 +88,13 @@ html,body{min-height:100%;background:#eef3f7;font-family:Arial,Helvetica,sans-se
       <div id="err" class="error" style="display:none"></div>
 
       <button id="payBtn" class="btn" onclick="initiatePayment()">Pay &amp; Connect Now</button>
+
+      <div id="reconnectArea" style="margin-top:18px;padding:14px;background:#e8f4f4;border:1.5px solid #0b7a75;display:none">
+        <p style="font-size:13px;font-weight:800;color:#075954;margin-bottom:8px">You already have an active WiFi plan.</p>
+        <div id="reconnectDetails" style="font-size:12px;color:#344054;margin-bottom:10px"></div>
+        <button class="btn" style="background:#0b7a75" onclick="manualReconnect()">Reconnect Now</button>
+      </div>
+      <div id="err" class="error" style="display:none"></div>
     </div>
 
     <div class="footer">TRINET SOLUTION &mdash; Fast &amp; Affordable WiFi in Tanzania</div>
@@ -108,8 +115,11 @@ let currentOrderId  = null;
 let pollTimer       = null;
 
 window.addEventListener('DOMContentLoaded', () => {
-  if (hotspot.mac) {
-    tryReconnect();
+  const cachedMac = localStorage.getItem('cp_mac');
+  const mac = hotspot.mac || cachedMac;
+  if (mac) {
+    localStorage.setItem('cp_mac', mac);
+    setTimeout(() => checkReconnectStatus(mac), 800);
   }
 });
 
@@ -166,30 +176,57 @@ function showSuccess(token, password, pkgName, loginUrl, dst) {
     if (primaryBtn) {
       primaryBtn.onclick = () => autoLogin(loginUrl, token, password, target);
     }
-    setTimeout(() => autoLogin(loginUrl, token, password, target), 1500);
   }
 }
 
 function autoLogin(loginUrl, token, password, dst) {
   if (!loginUrl || !token) return;
+  const target = dst || 'http://www.google.com';
   const form = document.createElement('form');
   form.method = 'POST';
   form.action = loginUrl;
-  form.innerHTML = '<input type="hidden" name="username" value="' + safe(token) + '"><input type="hidden" name="password" value="' + safe(password || '') + '"><input type="hidden" name="dst" value="' + safe(dst || 'http://www.google.com') + '">';
+  form.acceptCharset = 'UTF-8';
+  form.innerHTML = '<input type="hidden" name="username" value="' + safe(token) + '"><input type="hidden" name="password" value="' + safe(password || '') + '"><input type="hidden" name="dst" value="' + safe(target) + '"><input type="hidden" name="popup" value="true">';
   document.body.appendChild(form);
   form.submit();
 }
 
-async function tryReconnect() {
-  const mac = hotspot.mac;
+async function checkReconnectStatus(mac) {
   if (!mac) return;
   try {
     const res = await fetch('/api/payment/reconnect?mac=' + encodeURIComponent(mac));
     const data = await res.json();
     if (data.status === 'paid' && data.wifi_token) {
-      autoLogin(data.login_url, data.wifi_token, data.wifi_password, data.dst);
+      localStorage.setItem('cp_txn', data.wifi_token);
+      const area = document.getElementById('reconnectArea');
+      const details = document.getElementById('reconnectDetails');
+      details.innerHTML = '<strong>Token:</strong> ' + safe(data.wifi_token) + '<br><strong>Password:</strong> ' + safe(data.wifi_password || '');
+      area.style.display = 'block';
+      document.getElementById('payBtn').style.display = 'none';
     }
   } catch (e) { /* ignore */ }
+}
+
+function manualReconnect() {
+  const mac = hotspot.mac || localStorage.getItem('cp_mac');
+  if (!mac) return;
+  const txn = localStorage.getItem('cp_txn');
+  if (!txn) return;
+  showModal('🔄', 'Reconnecting...', 'Restoring your internet access. Please wait...', true);
+  fetch('/api/payment/reconnect?mac=' + encodeURIComponent(mac))
+    .then(r => r.json())
+    .then(data => {
+      if (data.status === 'paid' && data.wifi_token) {
+        autoLogin(data.login_url, data.wifi_token, data.wifi_password, data.dst);
+      } else {
+        document.getElementById('modal').classList.remove('show');
+        showError('Could not verify your session. Please try again or buy a new plan.');
+      }
+    })
+    .catch(() => {
+      document.getElementById('modal').classList.remove('show');
+      showError('Could not reach the server. Check your connection.');
+    });
 }
 
 async function initiatePayment() {
@@ -225,6 +262,9 @@ async function initiatePayment() {
     if (data.status === 'success') {
       currentTxnId   = data.transaction_id;
       currentOrderId = data.order_id;
+      if (hotspot.mac) {
+        localStorage.setItem('cp_mac', hotspot.mac);
+      }
       showModal('📱', 'Check Your Phone!',
         `A payment prompt of <strong>${selectedPrice.toLocaleString()} TZS</strong> has been sent to <strong>${phone}</strong>.<br><br>Confirm it on your phone to connect.`,
         true);
