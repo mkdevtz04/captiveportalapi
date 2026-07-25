@@ -41,7 +41,7 @@ class AdminController extends Controller
             ->orderByDesc('revenue')
             ->get();
 
-        return view('admin.dashboard', compact(
+        return view('dashboard', compact(
             'todayRevenue', 'weekRevenue', 'todayCount', 'weekCount',
             'activeSessions', 'recentPayments', 'topPackages'
         ));

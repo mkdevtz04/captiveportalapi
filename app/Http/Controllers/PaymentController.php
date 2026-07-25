@@ -24,6 +24,19 @@ class PaymentController extends Controller
         $this->mikrotik = $mikrotik;
     }
 
+    // Show voucher entry page
+    public function voucher(Request $request)
+    {
+        return view('voucher', [
+            'hotspot' => [
+                'mac'              => $request->query('mac'),
+                'ip'               => $request->query('ip'),
+                'link_login_only'  => $request->query('link-login-only'),
+                'link_orig'        => $request->query('link-orig'),
+            ],
+        ]);
+    }
+
     // Show portal page
     public function index(Request $request)
     {
