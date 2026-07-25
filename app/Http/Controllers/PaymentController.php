@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Support\Str;
+use App\Models\Payment;
 use App\Services\PalmPesaService;
 use App\Services\MikrotikService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class PaymentController extends Controller
@@ -88,6 +90,21 @@ class PaymentController extends Controller
                 Cache::put('mac_txn_' . $request->mac, $result['transaction_id'], now()->addMinutes(30));
             }
 
+            $this->persistPayment([
+                'transaction_id'   => $result['transaction_id'],
+                'order_id'         => $result['order_id'],
+                'phone'            => $request->phone,
+                'name'             => $name,
+                'package'          => $request->package,
+                'profile'          => $pkg['profile'],
+                'amount'           => $pkg['price'],
+                'status'           => 'pending',
+                'wifi_password'    => $password,
+                'client_mac'       => $request->mac,
+                'client_ip'        => $request->ip(),
+                'payment_response' => $result,
+            ]);
+
             return response()->json([
                 'status'         => 'success',
                 'message'        => 'Payment prompt sent to your phone!',
@@ -100,6 +117,33 @@ class PaymentController extends Controller
                 'status'  => 'error',
                 'message' => $e->getMessage(),
             ], 500);
+        }
+    }
+
+    private function persistPayment(array $data): void
+    {
+        try {
+            Payment::updateOrCreate(
+                ['transaction_id' => $data['transaction_id']],
+                [
+                    'order_id'        => $data['order_id'] ?? null,
+                    'phone'           => $data['phone'] ?? null,
+                    'name'            => $data['name'] ?? null,
+                    'package'         => $data['package'] ?? null,
+                    'profile'         => $data['profile'] ?? null,
+                    'amount'          => $data['amount'] ?? 0,
+                    'status'          => $data['status'] ?? 'pending',
+                    'wifi_token'      => $data['wifi_token'] ?? null,
+                    'wifi_password'   => $data['wifi_password'] ?? null,
+                    'client_mac'      => $data['client_mac'] ?? null,
+                    'client_ip'       => $data['client_ip'] ?? null,
+                    'payment_method'  => $data['payment_method'] ?? 'palmpesa',
+                    'payment_response'=> $data['payment_response'] ?? null,
+                    'paid_at'         => $data['paid_at'] ?? null,
+                ]
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Payment DB persist failed: ' . $e->getMessage());
         }
     }
 
@@ -212,6 +256,11 @@ class PaymentController extends Controller
         if (!empty($transaction['client_mac'])) {
             Cache::put('mac_txn_' . $transaction['client_mac'], $transactionId, now()->addDay());
         }
+
+        $this->persistPayment(array_merge($transaction, [
+            'status'   => 'paid',
+            'paid_at'  => now(),
+        ]));
 
         if (!$success) {
             Log::warning('MikroTik user creation failed but marked as paid anyway', ['tx' => $transactionId]);

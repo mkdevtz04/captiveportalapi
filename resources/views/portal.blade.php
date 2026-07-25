@@ -6,7 +6,7 @@
 <meta http-equiv="expires" content="-1">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="csrf-token" content="{{ csrf_token() }}">
-<title>TRINET SOLUTION - Buy WiFi</title>
+<title>ZAMZAM STATIONARY WIFI - Buy WiFi</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{min-height:100%;background:#eef3f7;font-family:Arial,Helvetica,sans-serif;color:#142033}
@@ -58,7 +58,7 @@ html,body{min-height:100%;background:#eef3f7;font-family:Arial,Helvetica,sans-se
     <div class="header">
       <div class="mark">TS</div>
       <div>
-        <div class="brand">TRINET SOLUTION</div>
+        <div class="brand">ZAMZAM STATIONARY WIFI</div>
         <div class="sub">WiFi Hotspot &mdash; Tanzania</div>
       </div>
     </div>
@@ -97,7 +97,7 @@ html,body{min-height:100%;background:#eef3f7;font-family:Arial,Helvetica,sans-se
       <div id="err" class="error" style="display:none"></div>
     </div>
 
-    <div class="footer">TRINET SOLUTION &mdash; Fast &amp; Affordable WiFi in Tanzania</div>
+    <div class="footer">ZAMZAM STATIONARY WIFI &mdash; Fast &amp; Affordable WiFi in Tanzania</div>
   </div>
 </main>
 
