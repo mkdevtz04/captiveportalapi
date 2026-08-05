@@ -11,12 +11,12 @@ class MikrotikService
     protected $port;
     protected $socket;
 
-    public function __construct()
+    public function __construct(array $settings = [])
     {
-        $this->ip   = config('services.mikrotik.ip');
-        $this->user = config('services.mikrotik.user');
-        $this->pass = config('services.mikrotik.password');
-        $this->port = config('services.mikrotik.port', 8728);
+        $this->ip   = $settings['ip']   ?? config('services.mikrotik.ip');
+        $this->user = $settings['user'] ?? config('services.mikrotik.user');
+        $this->pass = $settings['password'] ?? config('services.mikrotik.password');
+        $this->port = $settings['port'] ?? config('services.mikrotik.port', 8728);
     }
 
     public function connect(): bool
@@ -78,6 +78,63 @@ class MikrotikService
         }
     }
 
+    public function listHotspotUsers(): array
+    {
+        try {
+            $this->writeWord('/ip/hotspot/user/print');
+            $this->writeSentenceEnd();
+            $response = $this->read();
+            return $this->parseKeyValueResponse($response);
+        } catch (\Exception $e) {
+            Log::error('MikroTik listHotspotUsers: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function listProfiles(): array
+    {
+        try {
+            $this->writeWord('/ip/hotspot/user/profile/print');
+            $this->writeSentenceEnd();
+            $response = $this->read();
+            return $this->parseKeyValueResponse($response);
+        } catch (\Exception $e) {
+            Log::error('MikroTik listProfiles: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function removeHotspotUser(string $id): bool
+    {
+        try {
+            $this->writeWord('/ip/hotspot/user/remove');
+            $this->writeWord('=numbers=' . $id);
+            $this->writeSentenceEnd();
+            $response = $this->read();
+            Log::info('MikroTik user removed', ['id' => $id, 'response' => $response]);
+            return in_array('!done', $response);
+        } catch (\Exception $e) {
+            Log::error('MikroTik removeHotspotUser: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function disableHotspotUser(string $id): bool
+    {
+        try {
+            $this->writeWord('/ip/hotspot/user/set');
+            $this->writeWord('=numbers=' . $id);
+            $this->writeWord('=disabled=yes');
+            $this->writeSentenceEnd();
+            $response = $this->read();
+            Log::info('MikroTik user disabled', ['id' => $id, 'response' => $response]);
+            return in_array('!done', $response);
+        } catch (\Exception $e) {
+            Log::error('MikroTik disableHotspotUser: ' . $e->getMessage());
+            return false;
+        }
+    }
+
     private function login(): bool
     {
         $this->writeWord('/login');
@@ -132,5 +189,34 @@ class MikrotikService
             $response[] = $word;
         }
         return $response;
+    }
+
+    private function parseKeyValueResponse(array $response): array
+    {
+        $items = [];
+        $current = [];
+        foreach ($response as $word) {
+            if ($word === '!done') {
+                if (!empty($current)) {
+                    $items[] = $current;
+                }
+                continue;
+            }
+            if (str_starts_with($word, '=')) {
+                $parts = explode('=', $word, 3);
+                $key = ltrim($parts[1] ?? $parts[0], '=');
+                $value = $parts[2] ?? '';
+                $current[$key] = $value;
+            } elseif ($word === '!re' || $word === '!trap') {
+                if (!empty($current)) {
+                    $items[] = $current;
+                    $current = [];
+                }
+            }
+        }
+        if (!empty($current)) {
+            $items[] = $current;
+        }
+        return $items;
     }
 }
