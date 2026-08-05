@@ -41,7 +41,7 @@
                                 <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Port</label>
                                 <input type="number" name="port" value="{{ old('port', $settings->port ?? 8728) }}" class="w-full border rounded px-3 py-2 text-sm" required>
                             </div>
-                            <button type="submit" class="w-full bg-gray-900 text-white text-sm font-bold py-2 rounded hover:bg-gray-800">Save Settings</button>
+                            <button type="submit" class="w-full bg-gray-900 text-black text-sm font-bold py-2 rounded hover:bg-gray-800">Save Settings</button>
                         </form>
                         <button id="testConnectionBtn" class="w-full mt-3 border border-gray-300 text-gray-700 text-sm font-bold py-2 rounded hover:bg-gray-50">
                             Test Connection
@@ -73,7 +73,7 @@
                                     @endforeach
                                 </select>
                             </div>
-                            <button type="submit" class="w-full bg-gray-900 text-white text-sm font-bold py-2 rounded hover:bg-gray-800">Create Voucher</button>
+                            <button type="submit" class="w-full bg-gray-900 text-black text-sm font-bold py-2 rounded hover:bg-gray-800">Create Voucher</button>
                         </form>
                         <div id="voucherResult" class="mt-3 text-xs hidden"></div>
                     </div>

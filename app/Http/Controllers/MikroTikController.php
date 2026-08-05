@@ -47,7 +47,7 @@ class MikroTikController extends Controller
 
         MikroTikSetting::updateOrCreate(['id' => 1], $data);
 
-        return redirect()->route('admin.mikrotik')->with('status', 'MikroTik settings saved.');
+        return redirect()->route('mikrotik.index')->with('status', 'MikroTik settings saved.');
     }
 
     public function testConnection(Request $request)
